@@ -9,14 +9,13 @@ Sub Worksheet_Change(ByVal Target As Range)
     Dim strFileName As String
     Dim KeyCells As Range
     
-    ' Full path and name of file.
-    strFileName = ThisWorkbook.Sheets("tools").Range("B3").Value & Target.Value & ".docx"
     
     ' h6:h30 are the cells that have the listener
     Set KeyCells = Range(ThisWorkbook.Sheets("tools").Range("B6").Value)
     
     If Not Application.Intersect(KeyCells, Range(Target.Address)) Is Nothing Then
-            
+            'Full path and name of file.
+            strFileName = ThisWorkbook.Sheets("tools").Range("B3").Value & Target.Value & ".docx"        
             If IsEmpty(Target.Value) Then
                 If (Not IsEmpty(Target.Offset(0, 1).Value)) Then
                     ActiveSheet.Shapes(Target.Offset(0, 1).Value).Delete
