@@ -1,0 +1,104 @@
+'@Author Carlos Marten 2014
+' Requirements:
+' - insert this code on sheet
+' - Have a 'tools' sheet with specific path [B3] and listening cells [B6] with specific format
+
+
+Sub Worksheet_Change(ByVal Target As Range)
+    
+    Dim strFileName As String
+    Dim KeyCells As Range
+    
+    ' Full path and name of file.
+    strFileName = ThisWorkbook.Sheets("tools").Range("B3").Value & Target.Value & ".docx"
+    
+    ' h6:h30 are the cells that have the listener
+    Set KeyCells = Range(ThisWorkbook.Sheets("tools").Range("B6").Value)
+    
+    If Not Application.Intersect(KeyCells, Range(Target.Address)) Is Nothing Then
+            
+            If IsEmpty(Target.Value) Then
+                If (Not IsEmpty(Target.Offset(0, 1).Value)) Then
+                    ActiveSheet.Shapes(Target.Offset(0, 1).Value).Delete
+                    Dim procName As String
+                    procName = (Target.Offset(0, 1).Value & "_Click")
+                    DeleteProcedureCode ThisWorkbook, ActiveSheet.CodeName, procName
+                    Target.Offset(0, 1).Value = ""
+                End If
+            Else
+                'check if file exists
+                If Len(Dir(strFileName)) = 0 Then
+                    MsgBox "File does not exist"
+                Else
+                    ' If button has been created before, delete it to create a new one
+                    If Not IsEmpty(Target.Offset(0, 1).Value) Then
+                        ActiveSheet.Shapes(Target.Offset(0, 1).Value).Delete
+                        procName = (Target.Offset(0, 1).Value & "_Click")
+                        DeleteProcedureCode ThisWorkbook, ActiveSheet.CodeName, procName
+                        Target.Offset(0, 1).Value = ""
+                    End If
+                    
+                    Dim ctl As OLEObject, N%
+                    Dim rng As Range
+                    
+                    ' Create command button
+                    Set rng = ActiveSheet.Range(Target.Offset(0, 1).Address)  'target address +1 column
+                    Set ctl = ActiveSheet.OLEObjects.Add(ClassType:="Forms.CommandButton.1", Link:=False, DisplayAsIcon:=False)
+                    
+                    ctl.Object.Caption = "Open File"
+                    ctl.Name = Target.Value
+                    ctl.Top = rng.Top
+                    ctl.Left = rng.Left
+                    ctl.Width = rng.Width
+                    ctl.Height = rng.RowHeight
+                    ctl.Placement = xlMoveAndSize
+                    
+                    
+                    With ThisWorkbook.VBProject.VBComponents(ActiveSheet.CodeName).CodeModule
+                             N = .CountOfLines
+                            .InsertLines N + 1, "Private Sub " & Target.Value & "_Click()"
+                            .InsertLines N + 2, vbTab & "Set wordapp = CreateObject(" & """" & "word.Application" & """" & ")"
+                            .InsertLines N + 3, vbTab & "If Not FileLocked(" & """" & strFileName & """" & ") Then"
+                            .InsertLines N + 4, vbTab & vbTab & "wordapp.documents.Open " & """" & "file://\\" & strFileName & """"
+                            .InsertLines N + 5, vbTab & vbTab & "wordapp.Visible = True"
+                            .InsertLines N + 6, vbTab & vbTab & "AppActivate (wordapp.Windows(1).Caption)"
+                            .InsertLines N + 7, vbTab & "End If"
+                            .InsertLines N + 8, "End Sub"
+                    End With
+                   
+                    Target.Offset(0, 1).Value = Target.Value
+                End If
+            End If
+    End If
+End Sub
+
+'Deletes the specified procedure from the specified workbook and module/sheet
+Sub DeleteProcedureCode(ByVal wb As Workbook, _
+    ByVal DeleteFromModuleName As String, ByVal ProcedureName As String)
+Dim VBCM As CodeModule, ProcStartLine As Long, ProcLineCount As Long
+    On Error Resume Next
+    Set VBCM = wb.VBProject.VBComponents(DeleteFromModuleName).CodeModule
+    If Not VBCM Is Nothing Then
+        Dim OrocStartLine As Integer
+        ProcStartLine = 0
+        ProcStartLine = VBCM.ProcStartLine(ProcedureName, vbext_pk_Proc)
+        If ProcStartLine > 0 Then
+            ProcLineCount = VBCM.ProcCountLines(ProcedureName, vbext_pk_Proc)
+            VBCM.DeleteLines ProcStartLine, ProcLineCount
+        End If
+        Set VBCM = Nothing
+    End If
+    On Error GoTo 0
+End Sub
+
+'Checks weather a specific file is already open by another process
+Function FileLocked(strFileName As String) As Boolean
+   On Error Resume Next
+   Open strFileName For Binary Access Read Write Lock Read Write As #1
+   Close #1
+   If Err.Number <> 0 Then
+      MsgBox "Word document is already open"
+      FileLocked = True
+      Err.Clear
+   End If
+End Function
