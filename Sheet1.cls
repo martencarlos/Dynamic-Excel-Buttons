@@ -29,6 +29,8 @@ Sub Worksheet_Change(ByVal Target As Range)
     Dim FilePath2 As String
     Dim KeyCells As Range
     
+    If Target.Cells.Count > 1 Then Exit Sub
+
     ' CELLS THAT HAVE THE LISTENERS
     Set KeyCells = Range(ThisWorkbook.Sheets("tools").Range("B6").Value)
     
